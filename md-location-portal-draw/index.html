@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MD Location Recognition Portal — Live Map + Drawing</title>
+  <link rel="stylesheet" href="styles.css" />
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <!-- Leaflet.draw CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"/>
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-mark">MD</div>
+      <div class="brand-text">
+        <div class="brand-title">MD Location Recognition</div>
+        <div class="brand-subtitle">Hub · Nexus · Tech Zone</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button id="switchRoleBtn" class="ghost">Role: <span id="activeRoleLabel">Applicant</span></button>
+      <div id="userMenu" class="user-menu">
+        <span id="userEmailLabel">guest@example.com</span>
+        <button id="logoutBtn" class="ghost">Logout</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- AUTH -->
+    <section id="authView" class="view active" role="region" aria-label="Authentication">
+      <div class="auth-card">
+        <h1>Sign in</h1>
+        <p class="muted">Demo-only: use any email + password. Choose a role to preview permissions.</p>
+        <form id="loginForm" autocomplete="on">
+          <label>Email
+            <input type="email" id="loginEmail" placeholder="you@company.com" required/>
+          </label>
+          <label>Password <span class="muted">(demo accepts any)</span>
+            <input type="password" id="loginPassword" placeholder="••••••••" required/>
+          </label>
+          <label>Login as
+            <select id="loginRole" aria-label="Select role">
+              <option>Applicant</option>
+              <option>MDEC Officer</option>
+              <option>Approver</option>
+              <option>Auditor</option>
+              <option>Subcontractor</option>
+              <option>Admin</option>
+            </select>
+          </label>
+          <button type="submit" class="primary">Continue</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- APP -->
+    <section id="appShell" class="view" role="region" aria-label="Application">
+      <nav class="sidebar" aria-label="Primary">
+        <div class="nav-group">
+          <div class="nav-title">Core</div>
+          <button data-route="dashboard" class="nav-item active">Dashboard</button>
+          <button data-route="applications" class="nav-item">Applications</button>
+          <button data-route="map" class="nav-item">Map</button>
+          <button data-route="tasks" class="nav-item role-officer role-approver">Task Inbox</button>
+          <button data-route="approvals" class="nav-item role-officer role-approver">Approvals</button>
+          <button data-route="audit" class="nav-item role-auditor role-admin">Audit Logs</button>
+          <button data-route="reports" class="nav-item role-officer role-approver role-admin">Reports</button>
+          <button data-route="admin" class="nav-item role-admin">Admin</button>
+        </div>
+      </nav>
+
+      <section class="content">
+        <div id="route-dashboard" class="route active" data-title="Dashboard">
+          <div class="grid three">
+            <div class="card metric"><div class="metric-label">In-Progress Applications</div><div class="metric-value" id="metricInProgress">–</div></div>
+            <div class="card metric"><div class="metric-label">Awaiting Approval</div><div class="metric-value" id="metricAwaiting">–</div></div>
+            <div class="card metric"><div class="metric-label">Recognised Locations</div><div class="metric-value" id="metricRecognised">–</div></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h2>Recent Activity</h2><div class="actions"><button class="ghost" id="refreshActivity">Refresh</button></div></div>
+            <div id="activityFeed" class="table like"></div>
+          </div>
+        </div>
+
+        <div id="route-applications" class="route" data-title="Applications">
+          <div class="toolbar">
+            <div class="toolbar-left"><input id="appSearch" type="search" placeholder="Search applications..." /></div>
+            <div class="toolbar-right"><button id="newApplicationBtn" class="primary">New Application</button></div>
+          </div>
+          <div id="applicationsTable" class="table"></div>
+        </div>
+
+        <div id="route-map" class="route" data-title="Map">
+          <div class="grid two">
+            <div class="card">
+              <div class="card-header">
+                <h2>Malaysia MD Locations (Live Map + Drawing)</h2>
+                <div class="actions">
+                  <select id="mapLayerSelect" aria-label="Map layer">
+                    <option value="all">All</option>
+                    <option value="hub">MD Hub</option>
+                    <option value="nexus">MD Nexus</option>
+                    <option value="tech">MD Tech Zone</option>
+                  </select>
+                </div>
+              </div>
+              <div id="leafletMap" class="map-canvas" aria-label="Interactive map"></div>
+              <p class="muted tiny">Tiles © OpenStreetMap contributors. Shapes are saved in your browser (localStorage).</p>
+            </div>
+            <div class="card">
+              <div class="card-header"><h3>Drawing Tools</h3></div>
+              <div class="stack">
+                <button id="btnStartDraw" class="ghost">Start Drawing</button>
+                <button id="btnStopDraw" class="ghost">Stop Drawing</button>
+                <button id="btnExportGeoJSON" class="primary">Export GeoJSON</button>
+                <label class="file">
+                  <input type="file" id="fileImportGeoJSON" accept=".json,.geojson"/>
+                  <span>Import GeoJSON</span>
+                </label>
+                <button id="btnClearShapes" class="ghost">Clear All Shapes</button>
+              </div>
+              <div class="stats">
+                <div><strong>Selected shape:</strong> <span id="shapeType">–</span></div>
+                <div><strong>Area:</strong> <span id="shapeArea">–</span></div>
+                <div><strong>Perimeter:</strong> <span id="shapePerimeter">–</span></div>
+              </div>
+              <p class="muted tiny">Tip: Use polygon to capture site boundary. Click a shape to see area/perimeter.</p>
+            </div>
+          </div>
+        </div>
+
+        <div id="route-tasks" class="route" data-title="Task Inbox"><div id="tasksTable" class="table"></div></div>
+        <div id="route-approvals" class="route" data-title="Approvals">
+          <div class="grid two">
+            <div class="card"><div class="card-header"><h3>Queue</h3></div><div id="approvalQueue" class="table"></div></div>
+            <div class="card"><div class="card-header"><h3>Details</h3></div><div id="approvalDetails" class="detail-panel"><p class="muted">Select an item from the queue.</p></div></div>
+          </div>
+        </div>
+
+        <div id="route-audit" class="route" data-title="Audit Logs"><div id="auditTable" class="table"></div></div>
+        <div id="route-reports" class="route" data-title="Reports">
+          <div class="grid two">
+            <div class="card"><div class="card-header"><h3>KPIs</h3></div><ul class="kpis" id="kpiList"></ul></div>
+            <div class="card"><div class="card-header"><h3>Download</h3></div><button id="exportCsvBtn">Export Applications CSV</button></div>
+          </div>
+        </div>
+
+        <div id="route-admin" class="route" data-title="Admin">
+          <div class="grid two">
+            <div class="card">
+              <div class="card-header"><h3>Master Data</h3></div>
+              <div class="tabs">
+                <button class="tab active" data-tab="tabHubs">MD Hubs</button>
+                <button class="tab" data-tab="tabNexus">MD Nexus</button>
+                <button class="tab" data-tab="tabTech">MD Tech Zones</button>
+              </div>
+              <div id="tabHubs" class="tab-body active"></div>
+              <div id="tabNexus" class="tab-body"></div>
+              <div id="tabTech" class="tab-body"></div>
+            </div>
+            <div class="card">
+              <div class="card-header"><h3>Users & Roles</h3></div>
+              <div id="usersTable" class="table"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <!-- WIZARD -->
+    <dialog id="wizardDialog">
+      <form method="dialog" id="wizardForm">
+        <div class="dialog-header">
+          <h3>New MD Location Application</h3>
+          <button value="cancel" class="ghost">&times;</button>
+        </div>
+        <div class="wizard-steps">
+          <div class="wizard-step active" data-step="1">
+            <h4>1. Company Profile</h4>
+            <div class="grid two">
+              <label>Company Name <input required name="companyName" placeholder="Aizach Niaga Sdn Bhd" /></label>
+              <label>SSM Number <input required name="ssm" placeholder="201301234567 (1234567-X)" /></label>
+              <label>Contact Person <input required name="contact" placeholder="Name" /></label>
+              <label>Email <input required type="email" name="email" placeholder="name@company.com" /></label>
+            </div>
+          </div>
+          <div class="wizard-step" data-step="2">
+            <h4>2. Site Details</h4>
+            <div class="grid two">
+              <label>MD Type
+                <select name="mdType" required>
+                  <option>MD Hub</option>
+                  <option>MD Nexus</option>
+                  <option>MD Tech Zone</option>
+                </select>
+              </label>
+              <label>State <input name="state" placeholder="Selangor" required/></label>
+              <label>District <input name="district" placeholder="Shah Alam"/></label>
+              <label>Coordinates (lat,lon) <input name="coords" placeholder="3.0738,101.5183" /></label>
+            </div>
+          </div>
+          <div class="wizard-step" data-step="3">
+            <h4>3. Compliance Checklist</h4>
+            <label class="checkbox"><input type="checkbox" name="zoning" required/> Proper zoning approval</label>
+            <label class="checkbox"><input type="checkbox" name="utilities" required/> Utilities readiness (Power, Water, Fiber)</label>
+            <label class="checkbox"><input type="checkbox" name="safety" required/> Safety & environmental compliance</label>
+          </div>
+          <div class="wizard-step" data-step="4">
+            <h4>4. Documents (Demo only)</h4>
+            <p class="muted">File uploads are simulated.</p>
+            <label>Upload SSM Certificate <input type="file" /></label>
+            <label>Upload Site Plan <input type="file" /></label>
+          </div>
+          <div class="wizard-step" data-step="5">
+            <h4>5. Declaration</h4>
+            <label class="checkbox"><input type="checkbox" name="declare" required/> I declare the information provided is true.</label>
+          </div>
+        </div>
+        <div class="dialog-footer">
+          <div class="left"><button id="wizardPrev" class="ghost" type="button">Back</button></div>
+          <div class="right">
+            <button id="wizardNext" class="ghost" type="button">Next</button>
+            <button id="wizardSubmit" class="primary" value="default">Submit</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <div id="toast" role="status" aria-live="polite"></div>
+  </main>
+
+  <footer class="app-footer">
+    <span>&copy; <span id="year"></span> MD Location System (Demo)</span>
+    <span class="muted">v0.3 draw-enabled</span>
+  </footer>
+
+  <!-- Leaflet + Draw JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+  <script>window.DEMO_POINTS = [
+    { code:'H-BGS', name:'Bangsar (Sample)', state:'WP Kuala Lumpur', coords:'3.1290,101.6840', type:'hub' },
+    { code:'N-SA',  name:'Plaza Azalea, Shah Alam (Sample)', state:'Selangor', coords:'3.0738,101.5183', type:'nexus' },
+    { code:'T-IP',  name:'Iskandar Puteri (Sample)', state:'Johor', coords:'1.4190,103.6550', type:'tech' }
+  ];</script>
+  <script src="app.js"></script>
+</body>
+</html>
