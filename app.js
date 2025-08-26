@@ -1,4 +1,4 @@
-// Live map + drawing tools (Leaflet.draw) + GeoJSON import/export
+// app.js with selectable approvals and drawing (same as previous cell)
 (() => {
   const qs = (sel, el=document) => el.querySelector(sel);
   const qsa = (sel, el=document) => [...el.querySelectorAll(sel)];
@@ -8,21 +8,15 @@
     jwt: null,
     user: null,
     role: 'Applicant',
-    db: {
-      applications: [],
-      tasks: [],
-      approvals: [],
-      audit: [],
-      master: { hubs: [], nexus: [], tech: [] },
-      users: []
-    },
+    ui: { selectedApprovalId: null },
+    db: { applications: [], tasks: [], approvals: [], audit: [], master: { hubs: [], nexus: [], tech: [] }, users: [] },
     map: { map: null, layers: {all: null, hub: null, nexus: null, tech: null}, drawn: null }
   };
 
-  const storageKey = 'mdloc.draw.v03';
+  const storageKey = 'mdloc.draw.v04';
   const shapesKey = 'mdloc.drawn.geojson';
   const toast = (msg)=>{ const t=qs('#toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2000); };
-  const save = ()=>localStorage.setItem(storageKey, JSON.stringify({jwt:state.jwt,user:state.user,role:state.role,db:state.db}));
+  const save = ()=>localStorage.setItem(storageKey, JSON.stringify({jwt:state.jwt,user:state.user,role:state.role,db:state.db,ui:state.ui}));
   const load = ()=>{ try{ return JSON.parse(localStorage.getItem(storageKey)); } catch{return null;} };
 
   function addDays(n){ const d=new Date(); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
@@ -31,19 +25,19 @@
     if (state.db.applications.length) return;
     const now = new Date().toISOString();
     state.db.applications = [
-      { id:'APP-1101', title:'MD Nexus at Bangsar', company:'Aizach Niaga Sdn Bhd', mdType:'MD Nexus', state:'WP Kuala Lumpur', status:'In Review', created:now },
-      { id:'APP-1102', title:'MD Tech Zone at Iskandar Puteri', company:'Pixel Tech Sdn Bhd', mdType:'MD Tech Zone', state:'Johor', status:'Pending Info', created:now },
-      { id:'APP-1103', title:'MD Hub at Shah Alam', company:'Southern Logic Berhad', mdType:'MD Hub', state:'Selangor', status:'Approved', created:now }
+      { id:'APP-1201', title:'MD Nexus at Bangsar', company:'Aizach Niaga Sdn Bhd', mdType:'MD Nexus', state:'WP Kuala Lumpur', status:'In Review', created:now },
+      { id:'APP-1202', title:'MD Tech Zone at Iskandar Puteri', company:'Pixel Tech Sdn Bhd', mdType:'MD Tech Zone', state:'Johor', status:'Pending Info', created:now },
+      { id:'APP-1203', title:'MD Hub at Shah Alam', company:'Southern Logic Berhad', mdType:'MD Hub', state:'Selangor', status:'Approved', created:now }
     ];
     state.db.tasks = [
-      { id:'T-401', ref:'APP-1101', title:'Initial screening', assignee:'MDEC Officer', due:addDays(3), status:'Open' },
-      { id:'T-402', ref:'APP-1102', title:'Request for clarification', assignee:'MDEC Officer', due:addDays(5), status:'Open' }
+      { id:'T-501', ref:'APP-1201', title:'Initial screening', assignee:'MDEC Officer', due:addDays(3), status:'Open' },
+      { id:'T-502', ref:'APP-1202', title:'Request for clarification', assignee:'MDEC Officer', due:addDays(5), status:'Open' }
     ];
     state.db.approvals = [
-      { id:'AQ-501', ref:'APP-1101', stage:'Pre-Approval', owner:'MDEC Officer', status:'Pending' },
-      { id:'AQ-502', ref:'APP-1103', stage:'Approval', owner:'Approver', status:'Approved' }
+      { id:'AQ-601', ref:'APP-1201', stage:'Pre-Approval', owner:'MDEC Officer', status:'Pending' },
+      { id:'AQ-602', ref:'APP-1203', stage:'Approval', owner:'Approver', status:'Approved' }
     ];
-    state.db.audit = [{ when: now, who:'system', action:'seed', details:'seeded with draw tools' }];
+    state.db.audit = [{ when: now, who:'system', action:'seed', details:'seeded with selectable approvals' }];
     const pts = (window.DEMO_POINTS || []);
     state.db.master.hubs  = pts.filter(p=>p.type==='hub').map(({code,name,state:st,coords})=>({code,name,state:st,coords}));
     state.db.master.nexus = pts.filter(p=>p.type==='nexus').map(({code,name,state:st,coords})=>({code,name,state:st,coords}));
@@ -71,7 +65,7 @@
     refreshAll();
   }
   function logout(){
-    state.jwt = null; state.user=null; state.role='Applicant';
+    state.jwt = null; state.user=null; state.role='Applicant'; state.ui.selectedApprovalId=null;
     save();
     qs('#appShell').classList.remove('active');
     qs('#authView').classList.add('active');
@@ -90,20 +84,15 @@
     if (route==='map') setTimeout(initMapIfNeeded, 50);
   }
 
-  function table(rows){
+  function table(rows, opts={}){
     const head = rows[0];
     const body = rows.slice(1);
     const tpl = [`<div class="row head">${head.map(h=>`<div class="cell">${h}</div>`).join('')}</div>`]
-      .concat(body.map(r=>`<div class="row">${r.map(c=>`<div class="cell">${c}</div>`).join('')}</div>`));
+      .concat(body.map(r=>`<div class="row ${opts.selectable?'selectable':''}">${r.map(c=>{
+        if (typeof c === 'object' && c.html) return `<div class="cell">${c.html}</div>`;
+        return `<div class="cell">${c}</div>`;
+      }).join('')}</div>`));
     return tpl.join('');
-  }
-  function badge(text){
-    const t = String(text||'').toLowerCase();
-    let cls='info';
-    if (['approved','ok','open'].some(s=>t.includes(s))) cls='ok';
-    else if (['pending','review','await'].some(s=>t.includes(s))) cls='warn';
-    else if (['rejected','bad','failed'].some(s=>t.includes(s))) cls='bad';
-    return `<span class="badge ${cls}">${text}</span>`;
   }
 
   function renderApplications(){
@@ -124,16 +113,77 @@
     qs('#metricAwaiting').textContent = awaiting;
     qs('#metricRecognised').textContent = recognised;
   }
+
+  function renderApprovals(){
+    const rows = [['ID','Ref','Stage','Owner','Status']];
+    state.db.approvals.forEach(a=>rows.push([a.id, a.ref, a.stage, a.owner, a.status]));
+    const container = qs('#approvalQueue');
+    container.innerHTML = table(rows, {selectable:true});
+    const rowEls = [...container.querySelectorAll('.row')].slice(1); // skip header
+    rowEls.forEach(row=>{
+      const id = row.querySelector('.cell')?.textContent.trim();
+      row.setAttribute('tabindex','0');
+      if (state.ui.selectedApprovalId===id) row.classList.add('selected');
+      const choose = ()=> selectApproval(id, row);
+      row.addEventListener('click', choose);
+      row.addEventListener('keydown', (e)=>{
+        if (e.key==='Enter' || e.key===' ') { e.preventDefault(); choose(); }
+      });
+    });
+    renderApprovalDetails();
+  }
+
+  function selectApproval(id, rowEl){
+    state.ui.selectedApprovalId = id;
+    save();
+    qsa('#approvalQueue .row').forEach(r=>r.classList.remove('selected'));
+    if (rowEl) rowEl.classList.add('selected');
+    renderApprovalDetails();
+  }
+
+  function renderApprovalDetails(){
+    const d = qs('#approvalDetails');
+    const a = state.db.approvals.find(x=>x.id===state.ui.selectedApprovalId);
+    if (!a){
+      d.innerHTML = '<p class="muted">Select an item from the queue.</p>';
+      return;
+    }
+    const app = state.db.applications.find(x=>x.id===a.ref);
+    d.innerHTML = `
+      <div class="grid two">
+        <div><strong>Approval ID:</strong><br>${a.id}</div>
+        <div><strong>Stage:</strong><br>${a.stage}</div>
+        <div><strong>Status:</strong><br>${a.status}</div>
+        <div><strong>Owner:</strong><br>${a.owner}</div>
+        <div><strong>Application Ref:</strong><br>${a.ref}</div>
+        <div><strong>Company:</strong><br>${app?app.company:'—'}</div>
+      </div>
+      <div style="margin-top:12px; display:flex; gap:8px">
+        <button id="btnApprove" class="primary">Approve</button>
+        <button id="btnRequestInfo" class="ghost">Request Info</button>
+        <button id="btnReject" class="ghost">Reject</button>
+      </div>
+      <p class="muted tiny" style="margin-top:6px">Buttons simulate status change only (no backend).</p>
+    `;
+    qs('#btnApprove').onclick = ()=>updateApprovalStatus(a.id, 'Approved');
+    qs('#btnRequestInfo').onclick = ()=>updateApprovalStatus(a.id, 'Pending Info');
+    qs('#btnReject').onclick = ()=>updateApprovalStatus(a.id, 'Rejected');
+  }
+
+  function updateApprovalStatus(id, status){
+    const a = state.db.approvals.find(x=>x.id===id);
+    if (!a) return;
+    a.status = status;
+    state.db.audit.push({ when:new Date().toISOString(), who: state.user?.email || 'user', action:'approval-status', details:`${id} -> ${status}` });
+    save();
+    renderApprovals();
+    toast(`Approval ${id} marked ${status}.`);
+  }
+
   function renderTasks(){
     const rows = [['Task','Ref','Assignee','Due','Status']];
     state.db.tasks.forEach(t=>rows.push([t.id, t.ref, t.assignee, t.due, t.status]));
     qs('#tasksTable').innerHTML = table(rows);
-  }
-  function renderApprovals(){
-    const rows = [['ID','Ref','Stage','Owner','Status']];
-    state.db.approvals.forEach(a=>rows.push([a.id,a.ref,a.stage,a.owner,a.status]));
-    qs('#approvalQueue').innerHTML = table(rows);
-    qs('#approvalDetails').innerHTML = '<p class="muted">Select an item from the queue.</p>';
   }
   function renderAudit(){
     const rows = [['When','Who','Action','Details']];
@@ -188,7 +238,6 @@
     state.map.layers.tech = L.layerGroup().addTo(lm);
     state.map.drawn = new L.FeatureGroup().addTo(lm);
 
-    // Load existing shapes from localStorage
     try {
       const saved = localStorage.getItem(shapesKey);
       if (saved){
@@ -202,17 +251,9 @@
       }
     } catch(e){ console.warn('GeoJSON load error', e); }
 
-    // Draw controls
     const drawControl = new L.Control.Draw({
       edit: { featureGroup: state.map.drawn },
-      draw: {
-        polyline: { shapeOptions: { weight: 3 } },
-        polygon: { allowIntersection: false, showArea: true },
-        rectangle: true,
-        circle: false,
-        circlemarker: false,
-        marker: true
-      }
+      draw: { polyline: { shapeOptions: { weight: 3 } }, polygon: { allowIntersection: false, showArea: true }, rectangle: true, circle: false, circlemarker: false, marker: true }
     });
     lm.addControl(drawControl);
 
@@ -243,8 +284,6 @@
     const isPolyline = layer instanceof L.Polyline && !(layer instanceof L.Polygon);
     const isMarker = layer instanceof L.Marker;
     if (isMarker) return { type: 'Marker', area: '–', perimeter: '–' };
-
-    // compute geodesic length/area (approx)
     let area = null, perimeter = null;
     if (isPolygon || isRectangle){
       const latlngs = layer.getLatLngs()[0];
@@ -264,7 +303,6 @@
     return { type:'Shape', area:'–', perimeter:'–' };
   }
 
-  // Haversine distance (m)
   function lmDistance(a, b){
     const R = 6371008.8;
     const dLat = (b.lat - a.lat) * Math.PI/180;
@@ -273,7 +311,6 @@
     const h = Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLon/2)**2;
     return 2*R*Math.asin(Math.sqrt(h));
   }
-  // Polygon area via spherical excess (approx); fallback to planar shoelace small areas
   function polygonArea(latlngs){
     if (latlngs.length < 3) return 0;
     const R = 6371008.8;
@@ -293,7 +330,6 @@
     toast('Shapes saved.');
   }
 
-  // Export / Import
   function exportGeoJSON(){
     const gj = state.map.drawn.toGeoJSON();
     const blob = new Blob([JSON.stringify(gj,null,2)], {type:'application/geo+json'});
@@ -406,7 +442,6 @@
       toast('Drawing enabled: use toolbar on the map (top-left).');
     });
     qs('#btnStopDraw').addEventListener('click', ()=>{
-      // Leaflet.draw has no global stop; remove any handlers by blurring map
       state.map.map && state.map.map.closePopup();
       toast('Drawing stopped.');
     });

@@ -5,9 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>MD Location Recognition Portal — Live Map + Drawing</title>
   <link rel="stylesheet" href="styles.css" />
-  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-  <!-- Leaflet.draw CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"/>
 </head>
 <body>
@@ -29,7 +27,6 @@
   </header>
 
   <main id="main">
-    <!-- AUTH -->
     <section id="authView" class="view active" role="region" aria-label="Authentication">
       <div class="auth-card">
         <h1>Sign in</h1>
@@ -56,7 +53,6 @@
       </div>
     </section>
 
-    <!-- APP -->
     <section id="appShell" class="view" role="region" aria-label="Application">
       <nav class="sidebar" aria-label="Primary">
         <div class="nav-group">
@@ -116,10 +112,7 @@
                 <button id="btnStartDraw" class="ghost">Start Drawing</button>
                 <button id="btnStopDraw" class="ghost">Stop Drawing</button>
                 <button id="btnExportGeoJSON" class="primary">Export GeoJSON</button>
-                <label class="file">
-                  <input type="file" id="fileImportGeoJSON" accept=".json,.geojson"/>
-                  <span>Import GeoJSON</span>
-                </label>
+                <label class="file"><input type="file" id="fileImportGeoJSON" accept=".json,.geojson"/><span>Import GeoJSON</span></label>
                 <button id="btnClearShapes" class="ghost">Clear All Shapes</button>
               </div>
               <div class="stats">
@@ -127,19 +120,25 @@
                 <div><strong>Area:</strong> <span id="shapeArea">–</span></div>
                 <div><strong>Perimeter:</strong> <span id="shapePerimeter">–</span></div>
               </div>
-              <p class="muted tiny">Tip: Use polygon to capture site boundary. Click a shape to see area/perimeter.</p>
+              <p class="muted tiny">Tip: Click a shape to see area/perimeter.</p>
+            </div>
+          </div>
+        </div>
+
+        <div id="route-approvals" class="route" data-title="Approvals">
+          <div class="grid two">
+            <div class="card">
+              <div class="card-header"><h3>Queue</h3></div>
+              <div id="approvalQueue" class="table"></div>
+            </div>
+            <div class="card">
+              <div class="card-header"><h3>Details</h3></div>
+              <div id="approvalDetails" class="detail-panel"><p class="muted">Select an item from the queue.</p></div>
             </div>
           </div>
         </div>
 
         <div id="route-tasks" class="route" data-title="Task Inbox"><div id="tasksTable" class="table"></div></div>
-        <div id="route-approvals" class="route" data-title="Approvals">
-          <div class="grid two">
-            <div class="card"><div class="card-header"><h3>Queue</h3></div><div id="approvalQueue" class="table"></div></div>
-            <div class="card"><div class="card-header"><h3>Details</h3></div><div id="approvalDetails" class="detail-panel"><p class="muted">Select an item from the queue.</p></div></div>
-          </div>
-        </div>
-
         <div id="route-audit" class="route" data-title="Audit Logs"><div id="auditTable" class="table"></div></div>
         <div id="route-reports" class="route" data-title="Reports">
           <div class="grid two">
@@ -170,7 +169,6 @@
       </section>
     </section>
 
-    <!-- WIZARD -->
     <dialog id="wizardDialog">
       <form method="dialog" id="wizardForm">
         <div class="dialog-header">
@@ -234,10 +232,9 @@
 
   <footer class="app-footer">
     <span>&copy; <span id="year"></span> MD Location System (Demo)</span>
-    <span class="muted">v0.3 draw-enabled</span>
+    <span class="muted">v0.4 selectable queues</span>
   </footer>
 
-  <!-- Leaflet + Draw JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
   <script>window.DEMO_POINTS = [
